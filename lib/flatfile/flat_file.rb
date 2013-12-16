@@ -1,14 +1,15 @@
 =begin rdoc
-AtlasMapper == Map Atlas 
+=FlatFile - Flat File Template and Parser
 =end
+
 require 'pp'
 
-module AtlasMapper
-  class AMap
+module FlatFile
+  class FFMap
     attr_accessor :fields, :looping, :parent
 
     # looping: :stag to loop over.
-    # parent: parent AMap in nested constructs.
+    # parent: parent FFMap in nested constructs.
     def initialize(attr = {})
       @parent = attr[:parent]
       @fields = []
@@ -17,9 +18,9 @@ module AtlasMapper
     end
 
     # DSL - handle a new field
-    def field(atlasfield, length, sourcetag, default = nil, &block)
+    def field(ffield, length, sourcetag, default = nil, &block)
       @fields << {
-        afield: atlasfield, 
+        afield: ffield,
         length: length, 
         stag: sourcetag,
         default: default,
@@ -29,7 +30,7 @@ module AtlasMapper
     
     # DSL - looping: :stag to loop over.
     def line(name = nil, attr = {}, &block)
-      linemap = AMap.new parent: self, looping: attr[:looping]
+      linemap = FFMap.new parent: self, looping: attr[:looping]
       @fields << linemap
       linemap.fields << [:begin, name]
       block.call(linemap)
@@ -43,7 +44,7 @@ module AtlasMapper
     end
 
     # NOT PART OF THE DSL -- for looing constructs,
-    # tell us if we should reject this amap with regard to the given
+    # tell us if we should reject this ffmap with regard to the given
     # looping object.
     def reject?(lob)
       # @conditions has a list of [stag, block]
@@ -61,18 +62,18 @@ module AtlasMapper
   end
 
   module ClassMethods
-    def atlas(&block)
-      @@amap = AMap.new
-      block.call(@@amap)
+    def flat(&block)
+      @@ffmap = FFMap.new
+      block.call(@@ffmap)
     end
 
     # Render the results
     def render
-      @@amap.render
+      @@ffmap.render
     end
 
-    def amap
-      @@amap
+    def ffmap
+      @@ffmap
     end
   end
 
@@ -108,14 +109,14 @@ module AtlasMapper
 
   # render what we have.
   def render(attr = {})
-    amap = unless attr[:amap].nil?
-             attr[:amap]
+    ffmap = unless attr[:ffmap].nil?
+             attr[:ffmap]
            else
-             self.class.amap
+             self.class.ffmap
            end
         
-    def _inner_spire(amap, lob = nil)
-      amap.fields.map do |field|
+    def _inner_spire(ffmap, lob = nil)
+      ffmap.fields.map do |field|
         # here field will either be a hash or an array.
         # if an array, it is a marker for the beginning and ending of a line.
         if field.kind_of? Array
@@ -128,25 +129,25 @@ module AtlasMapper
             raise Exception.new "Unknown delimiter type #{field}"
           end
         elsif field.kind_of? Hash
-          render_field field, amap.looping => lob
-        elsif field.kind_of? AMap
-          render amap: field
+          render_field field, ffmap.looping => lob
+        elsif field.kind_of? FFMap
+          render ffmap: field
         else
           raise Exception.new("Unknown Field Type #{field.class}")
         end
       end.join
     end
     
-    unless amap.looping.nil?
-      unless @objects[amap.looping].nil?
-        @objects[amap.looping].map { |lob|
-          _inner_spire(amap, lob) unless amap.reject? lob
+    unless ffmap.looping.nil?
+      unless @objects[ffmap.looping].nil?
+        @objects[ffmap.looping].map { |lob|
+          _inner_spire(ffmap, lob) unless ffmap.reject? lob
         }.join
       else
         ''
       end
     else
-      _inner_spire amap
+      _inner_spire ffmap
     end
   end
 end
